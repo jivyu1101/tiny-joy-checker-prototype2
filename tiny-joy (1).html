@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>우리들의 소확행</title>
+  <script type="module" crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+  <script type="module" crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: sans-serif; }</style>
+</head>
+<body class="bg-slate-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useRef, useEffect } = React;
+
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+    function PercentBar({ color, percent }) {
+      const [anim, setAnim] = useState(0);
+      useEffect(() => {
+        let raf = 0; const start = performance.now();
+        const dur = 650;
+        const loop = (now) => {
+          const t = Math.min(1, (now - start) / dur);
+          setAnim(easeOutCubic(t));
+          if (t < 1) raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(raf);
+      }, [percent]);
+      const w = Math.max(0, Math.min(100, percent * anim));
+      const shown = Math.round(percent * anim);
+      return (
+        <div className="h-3 w-full bg-slate-100 rounded-full relative overflow-hidden">
+          <div className={"h-3 rounded-full bg-" + color + "-400 transition-[width] duration-500"} style={{ width: w + "%" }} />
+          <div className="absolute -top-6 -translate-x-1/2" style={{ left: w + "%" }}>
+            <div className={"px-2 py-0.5 text-xs rounded-full bg-" + color + "-500 text-white shadow"}>{shown}%</div>
+          </div>
+        </div>
+      );
+    }
+
+    const CATEGORIES = [
+      { id: "atmos", label: "공기/기상", color: "sky", children: ["첫눈 알림 기다리기","비 냄새 맡기","습기 높은 날 선풍기 바람","해질녘 난간 기대기","안개 낀 아침 사진","별똥별 찾기","천둥소리 듣기","폭우 창가 관찰","바람 결 따라 걷기","미세먼지 없는 날 창문 활짝"] },
+      { id: "kinetic", label: "신체/운동감", color: "orange", children: ["계단 두 칸씩 오르기","줄넘기 200회","버피 10개 스프린트","자전거 밤라이드","교내 언덕 전력질주","매트에서 구르기","트램폴린 5분","손으로 물수제비","농구 림 맞추기 챌린지","교실까지 파워워킹"] },
+      { id: "craft", label: "만들기/창작", color: "violet", children: ["10초 무드영상","3줄 산문","포스터 레이아웃 리믹스","낙서 아이콘 12개","로고 드래프트","폰카 RAW 보정","타임랩스 30초","종이 접기 구조물","1페이지 웹코딩","사운드 샘플링"] },
+    ];
+
+    function App() {
+      const [selected, setSelected] = useState([]);
+      const [submitted, setSubmitted] = useState(false);
+      const resultRef = useRef(null);
+
+      const toggle = (item) => {
+        setSubmitted(false);
+        setSelected((prev) => prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]);
+      };
+
+      const scores = useMemo(() => {
+        const s = {};
+        CATEGORIES.forEach((c) => (s[c.id] = 0));
+        selected.forEach((it) => {
+          const cat = CATEGORIES.find((c) => c.children.includes(it));
+          if (cat) s[cat.id]++;
+        });
+        return s;
+      }, [selected]);
+
+      const total = Object.values(scores).reduce((a, b) => a + b, 0);
+
+      useEffect(() => {
+        if (submitted && resultRef.current) {
+          resultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, [submitted]);
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-28">
+          <div className="max-w-6xl mx-auto p-6 space-y-8">
+            <header className="space-y-2">
+              <h1 className="text-3xl font-bold">우리들의 소확행</h1>
+            </header>
+
+            <section className="space-y-6">
+              {CATEGORIES.map((cat) => (
+                <div key={cat.id} className="bg-white rounded-2xl shadow p-4 space-y-3">
+                  <div className="text-lg font-semibold">{cat.label}</div>
+                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {cat.children.map((ch) => (
+                      <label key={ch}
+                        className={\`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition \${selected.includes(ch) ? 'bg-\${cat.color}-100 border-\${cat.color}-300' : 'bg-slate-50 hover:bg-slate-100'}\`}>
+                        <input type="checkbox" checked={selected.includes(ch)} onChange={() => toggle(ch)} />
+                        <span>{ch}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </section>
+
+            {submitted && total > 0 && (
+              <section ref={resultRef} className="bg-white rounded-2xl shadow p-6 space-y-5">
+                {CATEGORIES.map((cat) => {
+                  const value = scores[cat.id];
+                  const pct = total ? (100 * value) / total : 0;
+                  return (
+                    <div key={cat.id} className="space-y-1">
+                      <div className="flex justify-between text-sm"><span>{cat.label}</span><span>{value}개</span></div>
+                      <PercentBar color={cat.color} percent={pct} />
+                    </div>
+                  );
+                })}
+              </section>
+            )}
+          </div>
+
+          <div className="fixed bottom-4 left-0 right-0 flex justify-center">
+            <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border px-4 py-2 flex gap-3">
+              <button type="button" onClick={() => setSubmitted(true)}
+                className="px-5 py-2 rounded-xl text-white font-semibold shadow bg-indigo-600 hover:bg-indigo-700">
+                결과 보기
+              </button>
+              <button type="button" onClick={() => { setSelected([]); setSubmitted(false); }}
+                className="px-4 py-2 rounded-xl border bg-white hover:bg-slate-50">
+                초기화
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
